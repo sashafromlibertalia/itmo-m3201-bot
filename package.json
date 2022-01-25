@@ -1,0 +1,27 @@
+{
+  "dependencies": {
+    "@types/node": "^17.0.12",
+    "@types/node-telegram-bot-api": "^0.53.6",
+    "dotenv": "^14.3.0",
+    "node-telegram-bot-api": "^0.56.0",
+    "typescript": "^4.5.5"
+  },
+  "name": "itmo-m3201-bot",
+  "description": "🤖 Бот для канала Telegram моей учебной группы",
+  "version": "1.0.0",
+  "main": "index.js",
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sashafromlibertalia/itmo-m3201-bot.git"
+  },
+  "author": "Alexander Miroshnichenko",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/sashafromlibertalia/itmo-m3201-bot/issues"
+  },
+  "homepage": "https://github.com/sashafromlibertalia/itmo-m3201-bot#readme"
+}
