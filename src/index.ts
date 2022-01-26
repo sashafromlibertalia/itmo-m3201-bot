@@ -1,3 +1,4 @@
+import "reflect-metadata";
 import TelegramBot = require("node-telegram-bot-api");
 import Bot from "./bot/bot";
 import { TOKEN, ADMIN_IDs } from "./config";
@@ -12,8 +13,9 @@ listener.onText(/\/start/, async (msg: TelegramBot.Message) => {
 });
 
 listener.onText(/\/queue/, async (msg: TelegramBot.Message) => {
+    const userId = msg.from!.id
     const chatId = msg.chat.id;
-    if (!ADMIN_IDs.includes(chatId)) {
+    if (!ADMIN_IDs.includes(userId)) {
         await listener.sendMessage(chatId, invalidCredentials());
     }
     else {

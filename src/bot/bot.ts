@@ -1,14 +1,17 @@
+import { getRepository } from "typeorm";
+import { Queue } from "../entities/queue.entity";
+
 interface BotMethods {
     createQueue(): Promise<string>;
     greetUsers(): string;
 }
 
 export default class Bot implements BotMethods {
-    private readonly MAXIMUM_QUEUES_AMOUNT: number = 2
-    readonly queue: string[]
+    private readonly MAXIMUM_QUEUES_AMOUNT: number = 2;
+    private readonly queueRepository;
 
     constructor() {
-        this.queue = []
+        this.queueRepository = getRepository(Queue)
     }
 
     greetUsers(): string {
@@ -16,11 +19,15 @@ export default class Bot implements BotMethods {
     }
 
     async createQueue(): Promise<string> {
-        if (this.queue.length === this.MAXIMUM_QUEUES_AMOUNT) 
+        if ((await this.queueRepository.find()).length === this.MAXIMUM_QUEUES_AMOUNT)
             throw new Error("Уважаемые коллеги, лимит очередей исчерпан")
-
-        this.queue.push("TEST")
-
-        return "Очередь успешно добавлена, коллеги"
+        
+        try {
+            this.queueRepository.save(new Queue())
+            return "Очередь успешно добавлена, коллеги"
+        }
+        catch (error) {
+            throw new Error(error)
+        }
     }
 }
