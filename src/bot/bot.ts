@@ -1,18 +1,26 @@
-import Queue from '../bot/models/queue.model';
-
 interface BotMethods {
-    createQueue(): Queue;
+    createQueue(): Promise<string>;
+    greetUsers(): string;
 }
 
 export default class Bot implements BotMethods {
-    readonly queue: any[]
+    private readonly MAXIMUM_QUEUES_AMOUNT: number = 2
+    readonly queue: string[]
 
     constructor() {
         this.queue = []
     }
 
+    greetUsers(): string {
+        return "Мои команды:\n/queue - новая очередь\n/citgen - создание цитгена."
+    }
 
-    createQueue(): Queue {
-        throw new Error('Method not implemented.');
+    async createQueue(): Promise<string> {
+        if (this.queue.length === this.MAXIMUM_QUEUES_AMOUNT) 
+            throw new Error("Уважаемые коллеги, лимит очередей исчерпан")
+
+        this.queue.push("TEST")
+
+        return "Очередь успешно добавлена, коллеги"
     }
 }

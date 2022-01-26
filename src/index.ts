@@ -1,15 +1,28 @@
-import TelegramBot = require("node-telegram-bot-api"); 
+import TelegramBot = require("node-telegram-bot-api");
+import Bot from "./bot/bot";
+import { TOKEN, ADMIN_IDs } from "./config";
+import { invalidCredentials } from "./helpers/helpers";
 
-const listener = new TelegramBot(process.env.TOKEN, {polling: true});
+const listener = new TelegramBot(TOKEN, { polling: true });
+const bot = new Bot();
 
-listener.onText(/\/echo (.+)/, (msg, match: any) => {
-    // 'msg' is the received Message from Telegram
-    // 'match' is the result of executing the regexp above on the text content
-    // of the message
-  
+listener.onText(/\/start/, async (msg: TelegramBot.Message) => {
     const chatId = msg.chat.id;
-    const resp = match[1]; // the captured "whatever"
-  
-    // send back the matched "whatever" to the chat
-    listener.sendMessage(chatId, resp);
-  });
+    await listener.sendMessage(chatId, bot.greetUsers());
+});
+
+listener.onText(/\/queue/, async (msg: TelegramBot.Message) => {
+    const chatId = msg.chat.id;
+    if (!ADMIN_IDs.includes(chatId)) {
+        await listener.sendMessage(chatId, invalidCredentials());
+    }
+    else {
+        await bot.createQueue()
+            .then((data: string) => {
+                listener.sendMessage(chatId, data);
+            })
+            .catch((error: Error) => {
+                listener.sendMessage(chatId, error.message);
+            })
+    }
+})
