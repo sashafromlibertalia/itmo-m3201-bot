@@ -1,5 +1,5 @@
 import "reflect-metadata";
-import TelegramBot = require("node-telegram-bot-api");
+import * as TelegramBot from "node-telegram-bot-api"
 import Bot from "./bot/bot";
 import { TOKEN, ADMIN_IDs } from "./config";
 import { invalidCredentials } from "./helpers/helpers";

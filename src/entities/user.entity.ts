@@ -1,7 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, Index, ManyToOne } from "typeorm";
 import { Queue } from "./queue.entity";
 
-@Entity()
+@Entity("users")
 export class User {
     @PrimaryGeneratedColumn("uuid")
     id: number;

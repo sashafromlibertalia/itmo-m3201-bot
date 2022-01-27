@@ -1,7 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, OneToMany } from "typeorm";
 import { User } from "./user.entity";
 
-@Entity()
+@Entity("queues")
 export class Queue {
     @PrimaryGeneratedColumn()
     id: number;
@@ -9,7 +9,7 @@ export class Queue {
     @CreateDateColumn()
     createdAt: Date;
 
-    @Column()
+    @Column({default: 0})
     usersAmount: number;
 
     @OneToMany(() => User, user => user.queue)

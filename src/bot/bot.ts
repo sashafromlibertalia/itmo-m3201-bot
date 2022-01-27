@@ -1,5 +1,6 @@
-import { getRepository } from "typeorm";
+import { Connection, createConnection, getRepository, Repository } from "typeorm";
 import { Queue } from "../entities/queue.entity";
+import "reflect-metadata";
 
 interface BotMethods {
     createQueue(): Promise<string>;
@@ -8,10 +9,17 @@ interface BotMethods {
 
 export default class Bot implements BotMethods {
     private readonly MAXIMUM_QUEUES_AMOUNT: number = 2;
-    private readonly queueRepository;
+    private queueRepository: Repository<Queue>;
+    private connection: Connection;
+
+    private async createDbConnection() {
+        this.connection = await createConnection()
+    }
 
     constructor() {
-        this.queueRepository = getRepository(Queue)
+        this.createDbConnection().then(() => {
+            this.queueRepository = this.connection.getRepository(Queue)
+        })
     }
 
     greetUsers(): string {
