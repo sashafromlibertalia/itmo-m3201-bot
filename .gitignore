@@ -76,6 +76,8 @@ $RECYCLE.BIN/
 # Local History for Visual Studio Code
 .history/
 
+test
+
 ### VisualStudioCode Patch ###
 # Ignore all local history of files
 .history

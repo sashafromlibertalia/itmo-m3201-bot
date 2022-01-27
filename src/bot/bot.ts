@@ -4,7 +4,7 @@ import "reflect-metadata";
 
 interface BotMethods {
     createQueue(): Promise<string>;
-    greetUsers(): string;
+    getQueues(): Promise<string>;
 }
 
 export default class Bot implements BotMethods {
@@ -22,17 +22,23 @@ export default class Bot implements BotMethods {
         })
     }
 
-    greetUsers(): string {
-        return "Мои команды:\n/queue - новая очередь\n/citgen - создание цитгена."
-    }
-
     async createQueue(): Promise<string> {
         if ((await this.queueRepository.find()).length === this.MAXIMUM_QUEUES_AMOUNT)
             throw new Error("Уважаемые коллеги, лимит очередей исчерпан")
         
         try {
-            this.queueRepository.save(new Queue())
+            await this.queueRepository.save(new Queue())
             return "Очередь успешно добавлена, коллеги"
+        }
+        catch (error) {
+            throw new Error(error)
+        }
+    }
+
+    async getQueues(): Promise<string> {
+        try {
+            const queues = await this.queueRepository.find()
+            return `Информация о очередях:\n\n#${queues[0].id}. ${queues[0].createdAt}\n#${queues[1].id}. ${queues[1].createdAt}`
         }
         catch (error) {
             throw new Error(error)

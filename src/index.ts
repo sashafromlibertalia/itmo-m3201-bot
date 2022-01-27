@@ -7,12 +7,7 @@ import { invalidCredentials } from "./helpers/helpers";
 const listener = new TelegramBot(TOKEN, { polling: true });
 const bot = new Bot();
 
-listener.onText(/\/start/, async (msg: TelegramBot.Message) => {
-    const chatId = msg.chat.id;
-    await listener.sendMessage(chatId, bot.greetUsers());
-});
-
-listener.onText(/\/queue/, async (msg: TelegramBot.Message) => {
+listener.onText(/\/new/, async (msg: TelegramBot.Message) => {
     const userId = msg.from!.id
     const chatId = msg.chat.id;
     if (!ADMIN_IDs.includes(userId)) {
@@ -27,4 +22,12 @@ listener.onText(/\/queue/, async (msg: TelegramBot.Message) => {
                 listener.sendMessage(chatId, error.message);
             })
     }
+})
+
+listener.onText(/\/queues/, async (msg: TelegramBot.Message) => {
+    const chatId = msg.chat.id;
+    await bot.getQueues()
+        .then((data: string) => {
+            listener.sendMessage(chatId, data);
+        })
 })
