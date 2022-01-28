@@ -9,9 +9,6 @@ export class Queue {
     @CreateDateColumn()
     createdAt: Date;
 
-    @Column({default: 0})
-    usersAmount: number;
-
     @OneToMany(() => User, user => user.queue)
     users: User[];
 }

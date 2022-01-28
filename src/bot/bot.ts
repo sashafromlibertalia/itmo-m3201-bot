@@ -1,10 +1,13 @@
-import { Connection, createConnection, getRepository, Repository } from "typeorm";
+import { Connection, createConnection, Repository } from "typeorm";
 import { Queue } from "../entities/queue.entity";
 import "reflect-metadata";
+import { Queries } from "../helpers/queries";
 
 interface BotMethods {
     createQueue(): Promise<string>;
     getQueues(): Promise<string>;
+    createCitgen(citgenData: CitgenData): Promise<string>;
+    showQueue(command: string): Promise<string>;
 }
 
 export default class Bot implements BotMethods {
@@ -25,7 +28,7 @@ export default class Bot implements BotMethods {
     async createQueue(): Promise<string> {
         if ((await this.queueRepository.find()).length === this.MAXIMUM_QUEUES_AMOUNT)
             throw new Error("Уважаемые коллеги, лимит очередей исчерпан")
-        
+
         try {
             await this.queueRepository.save(new Queue())
             return "Очередь успешно добавлена, коллеги"
@@ -38,10 +41,25 @@ export default class Bot implements BotMethods {
     async getQueues(): Promise<string> {
         try {
             const queues = await this.queueRepository.find()
-            return `Информация о очередях:\n\n#${queues[0].id}. ${queues[0].createdAt}\n#${queues[1].id}. ${queues[1].createdAt}`
+            if (!queues.length) return "Уважаемые коллеги, очередей еще нет"
+
+            let result = "*Информация об очередях:*\n\n"
+            for (let queue of queues) {
+                const date = `${queue.createdAt.getDate()}/${("0" + (queue.createdAt.getMonth() + 1)).slice(-2)}/${queue.createdAt.getFullYear()}`                
+                result += `\`Очередь #${queue.id}\`\nДата создания: _${date}_\nЧисло людей: _${queue.users?.length || 0}_\n\n`
+            }
+            return result
         }
         catch (error) {
             throw new Error(error)
         }
+    }
+
+    showQueue(command: string): Promise<string> {
+        throw new Error("Method not implemented.");
+    }
+
+    async createCitgen(citgenData: CitgenData): Promise<string> {
+        throw new Error("Method not implemented.");
     }
 }
