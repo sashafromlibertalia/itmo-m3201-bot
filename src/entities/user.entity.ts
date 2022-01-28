@@ -18,7 +18,3 @@ export class User {
     @PrimaryGeneratedColumn("increment")
     queuePosition: number;
 }
-function AutoIncrement(arg0: {}) {
-    throw new Error("Function not implemented.");
-}
-

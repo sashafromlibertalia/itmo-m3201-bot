@@ -51,24 +51,24 @@ listener.onText(/\/queues/, async (msg: TelegramBot.Message) => {
         })
 })
 
-listener.onText(/\/citgen/, async (msg: TelegramBot.Message) => {
-    const chatId = msg.chat.id;
-    const data: CitgenData = {
-        author: `${msg.from!.first_name} ${msg.from!.last_name}`,
-        message: "Абоба"
-    }
+// listener.onText(/\/citgen/, async (msg: TelegramBot.Message) => {
+//     const chatId = msg.chat.id;
+//     const data: CitgenData = {
+//         author: `${msg.from!.first_name} ${msg.from!.last_name}`,
+//         message: "Абоба"
+//     }
 
-    await bot.createCitgen(data)
-        .then((data: string) => {
-            listener.sendMessage(chatId, data);
-        })
-})
+//     await bot.createCitgen(data)
+//         .then((data: string) => {
+//             listener.sendMessage(chatId, data);
+//         })
+// })
 
 listener.on("callback_query", async (query: TelegramBot.CallbackQuery) => {
     const chatId = query.message!.chat.id
     switch (query.data) {
-        case Queries.SHOW_SECOND_QUEUE:
         case Queries.SHOW_FIRST_QUEUE:
+        case Queries.SHOW_SECOND_QUEUE:
             await listener.answerCallbackQuery(query.id)
             await bot.showQueue(Number(query.data))
                 .then((data: string) => {
@@ -87,8 +87,7 @@ listener.on("callback_query", async (query: TelegramBot.CallbackQuery) => {
             break
         case Queries.ADD_NEW_USER_TO_QUEUE:
             await listener.answerCallbackQuery(query.id)
-            console.log(query);
-            
+
             const userDto: UserDTO = {
                 firstName: query.from!.first_name,
                 lastName: query.from!.last_name || "",
