@@ -3,7 +3,7 @@ import { Queue } from "./queue.entity";
 
 @Entity("users")
 export class User {
-    @PrimaryGeneratedColumn("uuid")
+    @Column()
     id: number;
 
     @Column()
@@ -15,7 +15,10 @@ export class User {
     @ManyToOne(() => Queue, queue => queue.users)
     queue: number
 
-    @Index({ unique: true })
-    @Column()
+    @PrimaryGeneratedColumn("increment")
     queuePosition: number;
 }
+function AutoIncrement(arg0: {}) {
+    throw new Error("Function not implemented.");
+}
+
