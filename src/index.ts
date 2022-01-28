@@ -9,7 +9,6 @@ import { UserDTO } from "./dto/user.dto";
 const listener = new TelegramBot(TOKEN, { polling: true });
 const bot = new Bot();
 
-
 listener.onText(/\/new/, async (msg: TelegramBot.Message) => {
     const userId = msg.from!.id
     const chatId = msg.chat.id;
@@ -17,7 +16,7 @@ listener.onText(/\/new/, async (msg: TelegramBot.Message) => {
         await listener.sendMessage(chatId, invalidCredentials());
     }
     else {
-        await bot.createQueue()
+        await bot.createQueue(chatId)
             .then((data: string) => {
                 listener.sendMessage(chatId, data);
             })
@@ -29,20 +28,12 @@ listener.onText(/\/new/, async (msg: TelegramBot.Message) => {
 
 listener.onText(/\/queues/, async (msg: TelegramBot.Message) => {
     const chatId = msg.chat.id;
-    const amount = await bot.getQueuesAmount()
-    await bot.getQueues()
+    await bot.getQueues(chatId)
         .then((data: string) => {
-            const keyboard = amount === 1 ? [
-                [{ text: 'Посмотреть эту очередь', callback_data: Queries.SHOW_FIRST_QUEUE, }],
-            ] : [
-                [{ text: 'Посмотреть первую очередь', callback_data: Queries.SHOW_FIRST_QUEUE, }],
-                [{ text: 'Посмотреть вторую очередь', callback_data: Queries.SHOW_SECOND_QUEUE }],
-            ]
-
             listener.sendMessage(chatId, data, {
                 parse_mode: "Markdown",
                 reply_markup: {
-                    inline_keyboard: amount !== 0 ? keyboard : [],
+                    inline_keyboard: [[{ text: 'Посмотреть эту очередь', callback_data: Queries.SHOW_FIRST_QUEUE }]]
                 }
             });
         })
@@ -68,9 +59,8 @@ listener.on("callback_query", async (query: TelegramBot.CallbackQuery) => {
     const chatId = query.message!.chat.id
     switch (query.data) {
         case Queries.SHOW_FIRST_QUEUE:
-        case Queries.SHOW_SECOND_QUEUE:
             await listener.answerCallbackQuery(query.id)
-            await bot.showQueue(Number(query.data))
+            await bot.showQueue(Number(query.data), chatId)
                 .then((data: string) => {
                     listener.sendMessage(chatId, data, {
                         parse_mode: "Markdown",
@@ -94,7 +84,7 @@ listener.on("callback_query", async (query: TelegramBot.CallbackQuery) => {
                 id: query.from!.id
             };
 
-            await bot.addUserToQueue(userDto)
+            await bot.addUserToQueue(userDto, chatId)
                 .then((data: string) => {
                     listener.sendMessage(chatId, data, {
                         parse_mode: "Markdown"

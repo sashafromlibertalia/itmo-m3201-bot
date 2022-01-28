@@ -9,6 +9,9 @@ export class Queue {
     @CreateDateColumn()
     createdAt: Date;
 
+    @Column()
+    chatId: number;
+
     @OneToMany(() => User, user => user.queue)
     users: User[];
 }
