@@ -22,8 +22,6 @@ export default class Bot implements BotMethods {
     private queueRepository: Repository<Queue>;
     private userRepository: Repository<User>;
 
-    private currentQueue: number | null;
-
     constructor() {
         this.createDbConnection().then(() => {
             this.queueRepository = this.connection.getRepository(Queue)
@@ -41,7 +39,7 @@ export default class Bot implements BotMethods {
 
         try {
             const queue = new Queue()
-            queue.chatId = chatId
+            queue.chatId = chatId.toString()
             await this.queueRepository.save(queue)
             return "Очередь успешно добавлена, коллеги"
         }
@@ -65,20 +63,18 @@ export default class Bot implements BotMethods {
 
     async showQueue(queueNumber: number, chatId: number): Promise<string> {
         if (![Queries.SHOW_FIRST_QUEUE.toString()].includes(queueNumber.toString()))
-            throw new Error("Такой команды не существует")
+            throw new Error("Такой команды не существует")            
 
         const queue = await this.queueRepository
             .createQueryBuilder("queue")
             .leftJoinAndSelect("queue.users", "user")
-            .where("queue.id LIKE :id", { id: queueNumber })
-            .andWhere("queue.chatId LIKE :chatId", { chatId: chatId })
+            .andWhere("queue.chatId LIKE :chatId", { chatId: chatId.toString() })
             .getOne()
 
-        this.currentQueue = queueNumber
         if (!queue) throw new Error("Такой очереди не существует")
-        if (!queue.users.length) return `\`Очередь ${queueNumber}\` пустая, коллеги`
+        if (!queue.users.length) return `\`Очередь ${queue.id}\` пустая, коллеги`
 
-        let data = `\`Очередь ${queueNumber}:\`\n\n`
+        let data = `\`Очередь ${queue.id}:\`\n\n`
         for (let user of queue.users.sort((u1, u2) => u1.queuePosition > u2.queuePosition ? 1 : u1.queuePosition < u2.queuePosition ? -1 : 0)) {
             data += `${user.queuePosition}. _${user.firstName} ${user.lastName}_\n`
         }
@@ -97,21 +93,17 @@ export default class Bot implements BotMethods {
                 return "Данный коллега уже добавлен во очередь"
 
             await this.userRepository.save(user);
-            const queueNum = this.currentQueue
 
             const queue = await this.queueRepository
                 .createQueryBuilder("queue")
                 .leftJoinAndSelect("queue.users", "user")
-                .where("queue.id LIKE :id", { id: this.currentQueue })
-                .andWhere("queue.chatId LIKE :chatId", { chatId: chatId })
-                .getMany()
+                .andWhere("queue.chatId LIKE :chatId", { chatId: chatId.toString() })
+                .getOne()
 
-            queue!.find(q => q.id === this.currentQueue)!.users.push(user)
+            queue!.users.push(user)
 
             await this.queueRepository.save(queue!)
-
-            this.currentQueue = null
-            return `*${userDTO.firstName} ${userDTO.lastName}* был успешно добавлен в \`очередь #${queueNum}\` `
+            return `*${userDTO.firstName} ${userDTO.lastName}* был успешно добавлен в \`очередь #${queue?.id}\` `
         }
         catch (error) {
             throw new Error(error)

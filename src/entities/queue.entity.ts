@@ -3,14 +3,14 @@ import { User } from "./user.entity";
 
 @Entity("queues")
 export class Queue {
-    @PrimaryGeneratedColumn()
+    @PrimaryGeneratedColumn("uuid")
     id: number;
 
     @CreateDateColumn()
     createdAt: Date;
 
     @Column()
-    chatId: number;
+    chatId: string;
 
     @OneToMany(() => User, user => user.queue)
     users: User[];
