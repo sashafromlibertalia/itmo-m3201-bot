@@ -7,10 +7,12 @@ import { User } from "../entities/user.entity";
 import { CitgenDTO } from "../dto/citgen.dto";
 
 interface BotMethods {
-    createQueue(chatId: number): Promise<string>;
-    getQueues(chatId: number): Promise<string>;
-    showQueue(queueNumber: number, chatId: number): Promise<string>;
-    addUserToQueue(user: UserDTO, chatId: number): Promise<string>;
+    createQueue(chatId: number): Promise<Queue>;
+    getQueues(chatId: number): Promise<Queue[]>;
+    showQueue(chatId: number): Promise<Queue>;
+    deleteQueue(id: string): Promise<void>;
+
+    addUserToQueue(user: UserDTO, chatId: number): Promise<User>;
 
     createCitgen(citgenDTO: CitgenDTO): Promise<string>;
 }
@@ -33,7 +35,7 @@ export default class Bot implements BotMethods {
         this.connection = await createConnection()
     }
 
-    async createQueue(chatId: number): Promise<string> {
+    async createQueue(chatId: number): Promise<Queue> {
         if ((await this.queueRepository.find({ where: { chatId: chatId } })).length === this.MAXIMUM_QUEUES_AMOUNT)
             throw new Error("Уважаемые коллеги, лимит очередей исчерпан")
 
@@ -41,59 +43,57 @@ export default class Bot implements BotMethods {
             const queue = new Queue()
             queue.chatId = chatId.toString()
             await this.queueRepository.save(queue)
-            return "Очередь успешно добавлена, коллеги"
+            return queue
         }
         catch (error) {
             throw new Error(error)
         }
     }
 
-    async getQueues(chatId: number): Promise<string> {
-        const queues = await this.queueRepository.find({ relations: ["users"], where: { chatId: chatId } })
-        if (!queues.length)
-            throw new Error("Уважаемые коллеги, очередей еще нет")
+    async getQueues(chatId: number): Promise<Queue[]> {
+        const queues = await this.queueRepository
+            .find({ relations: ["users"], where: { chatId: chatId } })
 
-        let data = "*Информация об очередях:*\n\n"
-        for (let queue of queues) {
-            const date = `${queue.createdAt.getDate()}/${("0" + (queue.createdAt.getMonth() + 1)).slice(-2)}/${queue.createdAt.getFullYear()}`
-            data += `\`Очередь #${queue.id}\`\nДата создания: _${date}_\nЧисло людей: _${queue.users?.length || 0}_\n\n`
-        }
-        return data
+        if (!queues.length) throw new Error("Уважаемые коллеги, очередей еще нет")
+
+        return queues
     }
 
-    async showQueue(queueNumber: number, chatId: number): Promise<string> {
-        if (![Queries.SHOW_FIRST_QUEUE.toString()].includes(queueNumber.toString()))
-            throw new Error("Такой команды не существует")            
-
+    async showQueue(chatId: number): Promise<Queue> {
         const queue = await this.queueRepository
             .createQueryBuilder("queue")
             .leftJoinAndSelect("queue.users", "user")
-            .andWhere("queue.chatId LIKE :chatId", { chatId: chatId.toString() })
+            .andWhere("queue.chatId = :chatId", { chatId: chatId.toString() })
             .getOne()
 
         if (!queue) throw new Error("Такой очереди не существует")
-        if (!queue.users.length) return `\`Очередь ${queue.id}\` пустая, коллеги`
 
-        let data = `\`Очередь ${queue.id}:\`\n\n`
-        for (let user of queue.users.sort((u1, u2) => u1.queuePosition > u2.queuePosition ? 1 : u1.queuePosition < u2.queuePosition ? -1 : 0)) {
-            data += `${user.queuePosition}. _${user.firstName} ${user.lastName}_\n`
-        }
-
-        return data
+        return queue
     }
 
-    async addUserToQueue(userDTO: UserDTO, chatId: number): Promise<string> {
-        const user = new User()
-        user.firstName = userDTO.firstName
-        user.lastName = userDTO.lastName
-        user.id = userDTO.id
+    async deleteQueue(id: string): Promise<void> {
+        const queue = await this.queueRepository.findOne({ where: { id: id } })
+        if (!queue) throw new Error(`*Очередь уже удалена*`)
+
+        this.queueRepository
+            .createQueryBuilder("queue")
+            .delete()
+            .from(Queue)
+            .where("id = :id", { id: id })
+            .execute()
+    }
+
+    async addUserToQueue(userDTO: UserDTO, chatId: number): Promise<User> {
+        if ((await this.userRepository.find()).find(user => user.telegramId === userDTO.id))
+            throw new Error("Данный коллега уже добавлен во очередь")
 
         try {
-            if ((await this.userRepository.find()).find(user => user.id === userDTO.id))
-                return "Данный коллега уже добавлен во очередь"
+            const user = new User()
+            user.firstName = userDTO.firstName
+            user.lastName = userDTO.lastName
+            user.telegramId = userDTO.id
 
             await this.userRepository.save(user);
-
             const queue = await this.queueRepository
                 .createQueryBuilder("queue")
                 .leftJoinAndSelect("queue.users", "user")
@@ -103,7 +103,7 @@ export default class Bot implements BotMethods {
             queue!.users.push(user)
 
             await this.queueRepository.save(queue!)
-            return `*${userDTO.firstName} ${userDTO.lastName}* был успешно добавлен в \`очередь #${queue?.id}\` `
+            return (await this.userRepository.findOne({ relations: ["queue"] }))!
         }
         catch (error) {
             throw new Error(error)

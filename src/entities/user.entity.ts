@@ -3,8 +3,11 @@ import { Queue } from "./queue.entity";
 
 @Entity("users")
 export class User {
-    @Column()
+    @PrimaryGeneratedColumn("uuid")
     id: number;
+
+    @Column()
+    telegramId: number;
 
     @Column()
     firstName: string;
@@ -12,9 +15,6 @@ export class User {
     @Column()
     lastName: string;
 
-    @ManyToOne(() => Queue, queue => queue.users)
-    queue: number
-
-    @PrimaryGeneratedColumn("increment")
-    queuePosition: number;
+    @ManyToOne(() => Queue, queue => queue.users, { cascade: true, onDelete: "CASCADE" })
+    queue: Queue;
 }

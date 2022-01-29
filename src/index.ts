@@ -2,9 +2,11 @@ import "reflect-metadata";
 import * as TelegramBot from "node-telegram-bot-api"
 import Bot from "./bot/bot";
 import { TOKEN, ADMIN_IDs } from "./config";
-import { invalidCredentials } from "./helpers/helpers";
+import { findCommand, invalidCredentials } from "./helpers/helpers";
 import { Queries } from "./helpers/queries";
 import { UserDTO } from "./dto/user.dto";
+import { Queue } from "./entities/queue.entity";
+import { User } from "./entities/user.entity";
 
 const listener = new TelegramBot(TOKEN, { polling: true });
 const bot = new Bot();
@@ -17,8 +19,12 @@ listener.onText(/\/new/, async (msg: TelegramBot.Message) => {
     }
     else {
         await bot.createQueue(chatId)
-            .then((data: string) => {
-                listener.sendMessage(chatId, data);
+            .then((data: Queue) => {
+                listener.sendMessage(chatId, "Очередь успешно добавлена, коллеги", {
+                    reply_markup: {
+                        inline_keyboard: [[{ text: 'Посмотреть эту очередь', callback_data: `${Queries.SHOW_QUEUE}-${data.id}` }]]
+                    }
+                });
             })
             .catch((error: Error) => {
                 listener.sendMessage(chatId, error.message);
@@ -29,11 +35,18 @@ listener.onText(/\/new/, async (msg: TelegramBot.Message) => {
 listener.onText(/\/queues/, async (msg: TelegramBot.Message) => {
     const chatId = msg.chat.id;
     await bot.getQueues(chatId)
-        .then((data: string) => {
-            listener.sendMessage(chatId, data, {
+        .then((data: Queue[]) => {
+            let response = "*Информация об очередях:*\n\n"
+            for (let queue of data) {
+                const date = `${queue.createdAt.getDate()}/${("0" + (queue.createdAt.getMonth() + 1)).slice(-2)}/${queue.createdAt.getFullYear()}`
+                response += `\`Очередь #${queue.id}\`\nДата создания: _${date}_\nЧисло людей: _${queue.users?.length || 0}_\n\n`
+            }    
+
+            listener.sendMessage(chatId, response, {
                 parse_mode: "Markdown",
                 reply_markup: {
-                    inline_keyboard: [[{ text: 'Посмотреть эту очередь', callback_data: Queries.SHOW_FIRST_QUEUE }]]
+                    inline_keyboard: [[{ text: 'Посмотреть эту очередь', callback_data: `${Queries.SHOW_QUEUE}-${data[0].id}` }],
+                    [{ text: 'Удалить очередь', callback_data: `${Queries.DELETE_QUEUE}-${data[0].id}` }]]
                 }
             });
         })
@@ -57,27 +70,39 @@ listener.onText(/\/queues/, async (msg: TelegramBot.Message) => {
 
 listener.on("callback_query", async (query: TelegramBot.CallbackQuery) => {
     const chatId = query.message!.chat.id
-    switch (query.data) {
-        case Queries.SHOW_FIRST_QUEUE:
-            await listener.answerCallbackQuery(query.id)
-            await bot.showQueue(Number(query.data), chatId)
-                .then((data: string) => {
-                    listener.sendMessage(chatId, data, {
+    const request = query.data?.replace(`${findCommand(query.data!)}-`, "")
+
+    await listener.answerCallbackQuery(query.id)
+    switch (findCommand(query.data!)) {
+        case Queries.SHOW_QUEUE:
+            await bot.showQueue(chatId)
+                .then((data: Queue) => {
+                    let response: string = ""
+                    if (data.users.length > 0) {
+                        response = `\`Очередь ${data.id}:\`\n\n`
+                        for (let [index, user] of data.users.entries()) {
+                            response += `${index + 1}. _${user.firstName} ${user.lastName}_\n`
+                        }    
+                    } else {
+                        response = `\`Очередь ${data.id}\` пустая, коллеги`                        
+                    }
+
+                    listener.sendMessage(chatId, response, {
                         parse_mode: "Markdown",
                         reply_markup: {
                             inline_keyboard: [
-                                [{ text: 'Добавить участников', callback_data: Queries.ADD_NEW_USER_TO_QUEUE }],
+                                [{ text: 'Записаться', callback_data: Queries.ADD_NEW_USER_TO_QUEUE }],
                             ]
                         }
                     });
                 })
                 .catch((error: Error) => {
-                    listener.sendMessage(chatId, error.message);
+                    listener.sendMessage(chatId, error.message, {
+                        parse_mode: "Markdown"
+                    });
                 })
             break
         case Queries.ADD_NEW_USER_TO_QUEUE:
-            await listener.answerCallbackQuery(query.id)
-
             const userDto: UserDTO = {
                 firstName: query.from!.first_name,
                 lastName: query.from!.last_name || "",
@@ -85,8 +110,9 @@ listener.on("callback_query", async (query: TelegramBot.CallbackQuery) => {
             };
 
             await bot.addUserToQueue(userDto, chatId)
-                .then((data: string) => {
-                    listener.sendMessage(chatId, data, {
+                .then((data: User) => {
+                    const response = `*${data.firstName} ${data.lastName}* был успешно добавлен в \`очередь #${data.queue.id}\` `
+                    listener.sendMessage(chatId, response, {
                         parse_mode: "Markdown"
                     });
                 })
@@ -94,7 +120,22 @@ listener.on("callback_query", async (query: TelegramBot.CallbackQuery) => {
                     listener.sendMessage(chatId, error.message);
                 })
             break
+        case Queries.DELETE_QUEUE:    
+            await bot.deleteQueue(request!)
+                .then(() => {
+                    const response = `*Очередь была успешно удалена*`
+                    listener.sendMessage(chatId, response, {
+                        parse_mode: "Markdown"
+                    })
+                })
+                .catch((error: Error) => {
+                    listener.sendMessage(chatId, error.message, {
+                        parse_mode: "Markdown"
+                    });
+                })
+            break
         default:
+            listener.sendMessage(chatId, "Уважаемые коллеги, неизвестная команда")
             break
     }
 })
