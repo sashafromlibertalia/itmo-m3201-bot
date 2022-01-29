@@ -93,18 +93,23 @@ listener.on("callback_query", async (query: TelegramBot.CallbackQuery) => {
                 })
             break
         case Queries.DELETE_QUEUE:
-            await bot.deleteQueue(request!)
-                .then(() => {
-                    const response = `*Очередь была успешно удалена*`
-                    listener.sendMessage(chatId, response, {
-                        parse_mode: "Markdown"
+            const userId = query.from.id
+            if (!ADMIN_IDs.includes(userId)) {
+                await listener.sendMessage(chatId, invalidCredentials());
+            } else {
+                await bot.deleteQueue(request!)
+                    .then(() => {
+                        const response = `*Очередь была успешно удалена*`
+                        listener.sendMessage(chatId, response, {
+                            parse_mode: "Markdown"
+                        })
                     })
-                })
-                .catch((error: Error) => {
-                    listener.sendMessage(chatId, error.message, {
-                        parse_mode: "Markdown"
-                    });
-                })
+                    .catch((error: Error) => {
+                        listener.sendMessage(chatId, error.message, {
+                            parse_mode: "Markdown"
+                        });
+                    })
+            }
             break
         case Queries.SHOW_QUEUE:
             await bot.showQueue(chatId)
