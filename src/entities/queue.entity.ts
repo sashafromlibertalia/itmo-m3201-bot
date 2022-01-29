@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, OneToMany } from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToMany, JoinTable } from "typeorm";
 import { User } from "./user.entity";
 
 @Entity("queues")
@@ -12,6 +12,7 @@ export class Queue {
     @Column()
     chatId: string;
 
-    @OneToMany(() => User, user => user.queue)
+    @ManyToMany(() => User, user => user.queues)
+    @JoinTable()
     users: User[];
 }

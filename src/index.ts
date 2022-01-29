@@ -40,7 +40,7 @@ listener.onText(/\/queues/, async (msg: TelegramBot.Message) => {
             for (let queue of data) {
                 const date = `${queue.createdAt.getDate()}/${("0" + (queue.createdAt.getMonth() + 1)).slice(-2)}/${queue.createdAt.getFullYear()}`
                 response += `\`Очередь #${queue.id}\`\nДата создания: _${date}_\nЧисло людей: _${queue.users?.length || 0}_\n\n`
-            }    
+            }
 
             listener.sendMessage(chatId, response, {
                 parse_mode: "Markdown",
@@ -74,6 +74,38 @@ listener.on("callback_query", async (query: TelegramBot.CallbackQuery) => {
 
     await listener.answerCallbackQuery(query.id)
     switch (findCommand(query.data!)) {
+        case Queries.ADD_NEW_USER_TO_QUEUE:
+            const userDto: UserDTO = {
+                firstName: query.from!.first_name,
+                lastName: query.from!.last_name || "",
+                id: query.from!.id
+            };
+
+            await bot.addUserToQueue(userDto, chatId)
+                .then((data: User) => {
+                    const response = `*${data.firstName} ${data.lastName}* был успешно добавлен в \`очередь #${data.queues.find(q => q.chatId === chatId.toString())!.id}\` `
+                    listener.sendMessage(chatId, response, {
+                        parse_mode: "Markdown"
+                    });
+                })
+                .catch((error: Error) => {
+                    listener.sendMessage(chatId, error.message);
+                })
+            break
+        case Queries.DELETE_QUEUE:
+            await bot.deleteQueue(request!)
+                .then(() => {
+                    const response = `*Очередь была успешно удалена*`
+                    listener.sendMessage(chatId, response, {
+                        parse_mode: "Markdown"
+                    })
+                })
+                .catch((error: Error) => {
+                    listener.sendMessage(chatId, error.message, {
+                        parse_mode: "Markdown"
+                    });
+                })
+            break
         case Queries.SHOW_QUEUE:
             await bot.showQueue(chatId)
                 .then((data: Queue) => {
@@ -82,9 +114,9 @@ listener.on("callback_query", async (query: TelegramBot.CallbackQuery) => {
                         response = `\`Очередь ${data.id}:\`\n\n`
                         for (let [index, user] of data.users.entries()) {
                             response += `${index + 1}. _${user.firstName} ${user.lastName}_\n`
-                        }    
+                        }
                     } else {
-                        response = `\`Очередь ${data.id}\` пустая, коллеги`                        
+                        response = `\`Очередь ${data.id}\` пустая, коллеги`
                     }
 
                     listener.sendMessage(chatId, response, {
@@ -95,38 +127,6 @@ listener.on("callback_query", async (query: TelegramBot.CallbackQuery) => {
                             ]
                         }
                     });
-                })
-                .catch((error: Error) => {
-                    listener.sendMessage(chatId, error.message, {
-                        parse_mode: "Markdown"
-                    });
-                })
-            break
-        case Queries.ADD_NEW_USER_TO_QUEUE:
-            const userDto: UserDTO = {
-                firstName: query.from!.first_name,
-                lastName: query.from!.last_name || "",
-                id: query.from!.id
-            };
-
-            await bot.addUserToQueue(userDto, chatId)
-                .then((data: User) => {
-                    const response = `*${data.firstName} ${data.lastName}* был успешно добавлен в \`очередь #${data.queue.id}\` `
-                    listener.sendMessage(chatId, response, {
-                        parse_mode: "Markdown"
-                    });
-                })
-                .catch((error: Error) => {
-                    listener.sendMessage(chatId, error.message);
-                })
-            break
-        case Queries.DELETE_QUEUE:    
-            await bot.deleteQueue(request!)
-                .then(() => {
-                    const response = `*Очередь была успешно удалена*`
-                    listener.sendMessage(chatId, response, {
-                        parse_mode: "Markdown"
-                    })
                 })
                 .catch((error: Error) => {
                     listener.sendMessage(chatId, error.message, {

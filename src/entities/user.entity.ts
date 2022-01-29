@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, Index, ManyToOne } from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, ManyToMany } from "typeorm";
 import { Queue } from "./queue.entity";
 
 @Entity("users")
@@ -15,6 +15,6 @@ export class User {
     @Column()
     lastName: string;
 
-    @ManyToOne(() => Queue, queue => queue.users, { cascade: true, onDelete: "CASCADE" })
-    queue: Queue;
+    @ManyToMany(() => Queue, queue => queue.users, { cascade: true, onDelete: "CASCADE" })
+    queues: Queue[];
 }

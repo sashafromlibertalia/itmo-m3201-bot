@@ -71,20 +71,13 @@ export default class Bot implements BotMethods {
         return queue
     }
 
-    async deleteQueue(id: string): Promise<void> {
-        const queue = await this.queueRepository.findOne({ where: { id: id } })
-        if (!queue) throw new Error(`*Очередь уже удалена*`)
-
-        this.queueRepository
-            .createQueryBuilder("queue")
-            .delete()
-            .from(Queue)
-            .where("id = :id", { id: id })
-            .execute()
-    }
-
     async addUserToQueue(userDTO: UserDTO, chatId: number): Promise<User> {
-        if ((await this.userRepository.find()).find(user => user.telegramId === userDTO.id))
+        if (await this.userRepository
+            .createQueryBuilder("user")
+            .leftJoinAndSelect("user.queues", "queue")
+            .where("queue.chatId = :chatId", { chatId: chatId.toString() })
+            .andWhere("user.telegramId = :telegramId", { telegramId: userDTO.id })
+            .getOne())
             throw new Error("Данный коллега уже добавлен во очередь")
 
         try {
@@ -97,17 +90,33 @@ export default class Bot implements BotMethods {
             const queue = await this.queueRepository
                 .createQueryBuilder("queue")
                 .leftJoinAndSelect("queue.users", "user")
-                .andWhere("queue.chatId LIKE :chatId", { chatId: chatId.toString() })
+                .where("queue.chatId = :chatId", { chatId: chatId.toString() })
                 .getOne()
 
             queue!.users.push(user)
-
             await this.queueRepository.save(queue!)
-            return (await this.userRepository.findOne({ relations: ["queue"] }))!
+            return (await this.userRepository
+                .createQueryBuilder("user")
+                .leftJoinAndSelect("user.queues", "queue")
+                .where("queue.chatId = :chatId", { chatId: chatId.toString() })
+                .andWhere("user.telegramId = :telegramId", { telegramId: userDTO.id })
+                .getOne())!
         }
         catch (error) {
             throw new Error(error)
         }
+    }
+
+    async deleteQueue(id: string): Promise<void> {
+        const queue = await this.queueRepository.findOne({ where: { id: id } })
+        if (!queue) throw new Error(`*Очередь уже удалена*`)
+
+        this.queueRepository
+            .createQueryBuilder("queue")
+            .delete()
+            .from(Queue)
+            .where("id = :id", { id: id })
+            .execute()
     }
 
     async createCitgen(citgenDTO: CitgenDTO): Promise<string> {
