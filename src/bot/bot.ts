@@ -8,7 +8,6 @@ import { CitgenDTO } from "../dto/citgen.dto";
 
 interface BotMethods {
     createQueue(chatId: number): Promise<Queue>;
-    getQueues(chatId: number): Promise<Queue[]>;
     showQueue(chatId: number): Promise<Queue>;
     deleteQueue(id: string): Promise<void>;
 
@@ -48,15 +47,6 @@ export default class Bot implements BotMethods {
         catch (error) {
             throw new Error(error)
         }
-    }
-
-    async getQueues(chatId: number): Promise<Queue[]> {
-        const queues = await this.queueRepository
-            .find({ relations: ["users"], where: { chatId: chatId } })
-
-        if (!queues.length) throw new Error("Уважаемые коллеги, очередей еще нет")
-
-        return queues
     }
 
     async showQueue(chatId: number): Promise<Queue> {

@@ -19,12 +19,8 @@ listener.onText(/\/new/, async (msg: TelegramBot.Message) => {
     }
     else {
         await bot.createQueue(chatId)
-            .then((data: Queue) => {
-                listener.sendMessage(chatId, "Очередь успешно добавлена, коллеги", {
-                    reply_markup: {
-                        inline_keyboard: [[{ text: 'Посмотреть эту очередь', callback_data: `${Queries.SHOW_QUEUE}-${data.id}` }]]
-                    }
-                });
+            .then(() => {
+                listener.sendMessage(chatId, "Очередь успешно добавлена, коллеги");
             })
             .catch((error: Error) => {
                 listener.sendMessage(chatId, error.message);
@@ -34,24 +30,77 @@ listener.onText(/\/new/, async (msg: TelegramBot.Message) => {
 
 listener.onText(/\/queues/, async (msg: TelegramBot.Message) => {
     const chatId = msg.chat.id;
-    await bot.getQueues(chatId)
-        .then((data: Queue[]) => {
-            let response = "*Информация об очередях:*\n\n"
-            for (let queue of data) {
-                const date = `${queue.createdAt.getDate()}/${("0" + (queue.createdAt.getMonth() + 1)).slice(-2)}/${queue.createdAt.getFullYear()}`
-                response += `\`Очередь #${queue.id}\`\nДата создания: _${date}_\nЧисло людей: _${queue.users?.length || 0}_\n\n`
+    await bot.showQueue(chatId)
+        .then((data: Queue) => {
+            let response: string = ""
+            if (data.users.length > 0) {
+                response = `\`Очередь ${data.id}:\`\n\n`
+                for (let [index, user] of data.users.entries()) {
+                    response += `${index + 1}. _${user.firstName} ${user.lastName}_\n`
+                }
+            } else {
+                response = `\`Очередь ${data.id}\` пустая, коллеги`
             }
 
             listener.sendMessage(chatId, response, {
                 parse_mode: "Markdown",
                 reply_markup: {
-                    inline_keyboard: [[{ text: 'Посмотреть эту очередь', callback_data: `${Queries.SHOW_QUEUE}-${data[0].id}` }],
-                    [{ text: 'Удалить очередь', callback_data: `${Queries.DELETE_QUEUE}-${data[0].id}` }]]
+                    inline_keyboard: [
+                        [
+                            { text: 'Записаться', callback_data: Queries.ADD_NEW_USER_TO_QUEUE },
+                        ],
+                        [
+                            { text: 'Удалить очередь', callback_data: `${Queries.DELETE_QUEUE}-${data.id}` }
+                        ]
+                    ]
                 }
             });
         })
         .catch((error: Error) => {
-            listener.sendMessage(chatId, error.message);
+            listener.sendMessage(chatId, error.message, {
+                parse_mode: "Markdown"
+            });
+        })
+})
+
+listener.onText(/\/swap/, async (msg: TelegramBot.Message) => {
+    const chatId = msg.chat.id;
+    const KEYS_PER_ROW = 4
+
+    await bot.showQueue(chatId)
+        .then((data: Queue) => {
+            let response: string = ""
+            let keys: TelegramBot.KeyboardButton[][] = []
+
+            if (data.users.length > 0) {
+                response = `*${msg.from!.first_name}*, выбери коллегу, с кем хочешь свапнуться`
+                for (let i = 0; i < data.users.length; i += KEYS_PER_ROW) {
+                    keys.push(data.users.slice(i, i + KEYS_PER_ROW).filter(user => user.telegramId !== msg.from!.id).map(user => {
+                        return {
+                            text: user.firstName + " " + user.lastName,
+                        }
+                    }))
+                }      
+                keys.push([{text: "❌ Закрыть клавиатуру"}])          
+            } else {
+                response = `\`Очередь ${data.id}\` пустая, коллеги`
+            }
+            
+            listener.sendMessage(chatId, response, {
+                parse_mode: "Markdown",
+                reply_markup: {
+                    keyboard: keys,
+                    one_time_keyboard: true,
+                    selective: true,
+                    resize_keyboard: true
+                },
+                reply_to_message_id: msg.message_id
+            })
+        })
+        .catch((error: Error) => {
+            listener.sendMessage(chatId, error.message, {
+                parse_mode: "Markdown"
+            });
         })
 })
 
@@ -80,7 +129,6 @@ listener.on("callback_query", async (query: TelegramBot.CallbackQuery) => {
                 lastName: query.from!.last_name || "",
                 id: query.from!.id
             };
-
             await bot.addUserToQueue(userDto, chatId)
                 .then((data: User) => {
                     const response = `*${data.firstName} ${data.lastName}* был успешно добавлен в \`очередь #${data.queues.find(q => q.chatId === chatId.toString())!.id}\` `
@@ -110,57 +158,6 @@ listener.on("callback_query", async (query: TelegramBot.CallbackQuery) => {
                         });
                     })
             }
-            break
-        case Queries.SHOW_QUEUE:
-            await bot.showQueue(chatId)
-                .then((data: Queue) => {
-                    let response: string = ""
-                    if (data.users.length > 0) {
-                        response = `\`Очередь ${data.id}:\`\n\n`
-                        for (let [index, user] of data.users.entries()) {
-                            response += `${index + 1}. _${user.firstName} ${user.lastName}_\n`
-                        }
-                    } else {
-                        response = `\`Очередь ${data.id}\` пустая, коллеги`
-                    }
-
-                    listener.sendMessage(chatId, response, {
-                        parse_mode: "Markdown",
-                        reply_markup: {
-                            inline_keyboard: [
-                                [
-                                    { text: 'Записаться', callback_data: Queries.ADD_NEW_USER_TO_QUEUE },
-                                    { text: 'Поменяться с другим', callback_data: `${Queries.SWAP}-${data.id}` }
-                                ]
-                            ]
-                        }
-                    });
-                })
-                .catch((error: Error) => {
-                    listener.sendMessage(chatId, error.message, {
-                        parse_mode: "Markdown"
-                    });
-                })
-            break
-        case Queries.SWAP:
-            await bot.showQueue(chatId).then((data) => {
-                let keys: TelegramBot.KeyboardButton[][] = []
-                for (let i = 0; i < data.users.length; i += 4) {
-                    keys.push(data.users.slice(i, i + 4).filter(user => user.telegramId !== query.from.id).map(user => {
-                        return {
-                            text: user.firstName + " " + user.lastName
-                        }
-                    }))
-                }
-                listener.sendMessage(chatId, `*${query.from.first_name}*, выбери коллегу, с кем хочешь свапнуться`, {
-                    parse_mode: "Markdown",
-                    reply_markup: {
-                        keyboard: keys,
-                        one_time_keyboard: true
-                    }
-                })
-            })
-
             break
         default:
             listener.sendMessage(chatId, "Уважаемые коллеги, неизвестная команда")
