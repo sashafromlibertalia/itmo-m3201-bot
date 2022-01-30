@@ -128,7 +128,10 @@ listener.on("callback_query", async (query: TelegramBot.CallbackQuery) => {
                         parse_mode: "Markdown",
                         reply_markup: {
                             inline_keyboard: [
-                                [{ text: 'Записаться', callback_data: Queries.ADD_NEW_USER_TO_QUEUE }],
+                                [
+                                    { text: 'Записаться', callback_data: Queries.ADD_NEW_USER_TO_QUEUE },
+                                    { text: 'Поменяться с другим', callback_data: `${Queries.SWAP}-${data.id}` }
+                                ]
                             ]
                         }
                     });
@@ -138,6 +141,26 @@ listener.on("callback_query", async (query: TelegramBot.CallbackQuery) => {
                         parse_mode: "Markdown"
                     });
                 })
+            break
+        case Queries.SWAP:
+            await bot.showQueue(chatId).then((data) => {
+                let keys: TelegramBot.KeyboardButton[][] = []
+                for (let i = 0; i < data.users.length; i += 4) {
+                    keys.push(data.users.slice(i, i + 4).filter(user => user.telegramId !== query.from.id).map(user => {
+                        return {
+                            text: user.firstName + " " + user.lastName
+                        }
+                    }))
+                }
+                listener.sendMessage(chatId, `*${query.from.first_name}*, выбери коллегу, с кем хочешь свапнуться`, {
+                    parse_mode: "Markdown",
+                    reply_markup: {
+                        keyboard: keys,
+                        one_time_keyboard: true
+                    }
+                })
+            })
+
             break
         default:
             listener.sendMessage(chatId, "Уважаемые коллеги, неизвестная команда")

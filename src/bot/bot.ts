@@ -72,13 +72,13 @@ export default class Bot implements BotMethods {
     }
 
     async addUserToQueue(userDTO: UserDTO, chatId: number): Promise<User> {
-        if (await this.userRepository
-            .createQueryBuilder("user")
-            .leftJoinAndSelect("user.queues", "queue")
-            .where("queue.chatId = :chatId", { chatId: chatId.toString() })
-            .andWhere("user.telegramId = :telegramId", { telegramId: userDTO.id })
-            .getOne())
-            throw new Error("Данный коллега уже добавлен во очередь")
+        // if (await this.userRepository
+        //     .createQueryBuilder("user")
+        //     .leftJoinAndSelect("user.queues", "queue")
+        //     .where("queue.chatId = :chatId", { chatId: chatId.toString() })
+        //     .andWhere("user.telegramId = :telegramId", { telegramId: userDTO.id })
+        //     .getOne())
+        //     throw new Error("Данный коллега уже добавлен во очередь")
 
         try {
             const user = new User()

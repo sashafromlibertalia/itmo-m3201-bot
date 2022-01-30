@@ -5,14 +5,8 @@ const invalidCredentials = () => {
 }
 
 const findCommand = (str: string) => {
-    if (str.includes(Queries.ADD_NEW_USER_TO_QUEUE))
-        return Queries.ADD_NEW_USER_TO_QUEUE
-
-    if (str.includes(Queries.DELETE_QUEUE))
-        return Queries.DELETE_QUEUE
-
-    if (str.includes(Queries.SHOW_QUEUE))
-        return Queries.SHOW_QUEUE
+    for (let cmd of Object.values(Queries))
+        if (str.includes(cmd)) return cmd
 }
 
 const downloadUserPic = () => {
