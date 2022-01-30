@@ -70,7 +70,7 @@ export default class Bot implements BotMethods {
             .andWhere("queue.chatId = :chatId", { chatId: chatId.toString() })
             .getOne()
 
-        if (!queue) throw new Error("Такой очереди не существует")
+        if (!queue) throw new Error("Очереди еще нет")
 
         return queue
     }

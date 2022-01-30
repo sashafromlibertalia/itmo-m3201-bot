@@ -2,7 +2,7 @@ import "reflect-metadata";
 import * as TelegramBot from "node-telegram-bot-api"
 import Bot from "./bot/bot";
 import { TOKEN, ADMIN_IDs } from "./config";
-import { findCommand, invalidCredentials, SWAP_EVENT_EMITTER } from "./helpers/helpers";
+import { findCommand, invalidCredentials, SWAP_EVENT_COMMITTER, SWAP_EVENT_EMITTER } from "./helpers/helpers";
 import { Queries } from "./helpers/queries";
 import { UserDTO } from "./dto/user.dto";
 import { Queue } from "./entities/queue.entity";
@@ -106,21 +106,46 @@ listener.onText(/\/swap/, async (msg: TelegramBot.Message) => {
 })
 
 listener.on("message", async (msg: TelegramBot.Message) => {
-    const chatId = msg.chat.id;    
+    const chatId = msg.chat.id;
     if (msg.reply_to_message?.text?.includes(SWAP_EVENT_EMITTER) &&
         msg.reply_to_message?.from?.is_bot) {
         const userToSwap: UserDTO = {
             firstName: msg.text!.split(" ")[0],
             lastName: msg.text!.split(" ")[1] || ""
         }
+
         bot.getUser(userToSwap, chatId)
-            .then((data) => {                                                
-                const response = `@${data.short}, с тобой хотят свапнуться, согласен?`
-                listener.sendMessage(chatId, response)
+            .then((data) => {
+                const response = `@${data.short}, с тобой хотят ${SWAP_EVENT_COMMITTER}, согласен?`
+                listener.sendMessage(chatId, response, {
+                    reply_markup: {
+                        keyboard: [[{ text: "Да" }, { text: "Нет" }]],
+                        one_time_keyboard: true,
+                        selective: true,
+                        resize_keyboard: true,
+                        remove_keyboard: true
+                    },
+                    reply_to_message_id: msg.message_id
+                })
             })
             .catch((error: Error) => {
                 listener.sendMessage(chatId, error.message)
             })
+    }
+    else if (msg.reply_to_message?.text?.includes(SWAP_EVENT_COMMITTER) &&
+        msg.reply_to_message?.from?.is_bot) {
+            console.log(msg);
+            
+        switch (msg.text!) {
+            case "Да":
+                // TODO
+                break
+            case "Нет":
+                listener.sendMessage(chatId, "Уважаемые коллеги, свап отменяется")
+                break
+            default:
+                break
+        }
     }
 })
 
