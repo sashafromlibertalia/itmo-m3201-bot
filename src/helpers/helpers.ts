@@ -13,4 +13,7 @@ const downloadUserPic = () => {
    
 }
 
-export { invalidCredentials, downloadUserPic, findCommand }
+// Костыль
+const SWAP_EVENT_EMITTER = "свапнуться"
+
+export { invalidCredentials, downloadUserPic, findCommand, SWAP_EVENT_EMITTER }

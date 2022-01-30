@@ -7,9 +7,12 @@ import { User } from "../entities/user.entity";
 import { CitgenDTO } from "../dto/citgen.dto";
 
 interface BotMethods {
+    getUser(userInfo: UserDTO, chatId: number): Promise<User>;
+
     createQueue(chatId: number): Promise<Queue>;
     showQueue(chatId: number): Promise<Queue>;
     deleteQueue(id: string): Promise<void>;
+    swapUsers(caller: number, swapper: string, chatId: number): Promise<Queue>;
 
     addUserToQueue(user: UserDTO, chatId: number): Promise<User>;
 
@@ -28,6 +31,17 @@ export default class Bot implements BotMethods {
             this.queueRepository = this.connection.getRepository(Queue)
             this.userRepository = this.connection.getRepository(User)
         })
+    }
+
+    async getUser(userInfo: UserDTO, chatId: number): Promise<User> {
+        const queue = await this.queueRepository
+            .createQueryBuilder("queue")
+            .leftJoinAndSelect("queue.users", "user")
+            .andWhere("queue.chatId = :chatId", { chatId: chatId.toString() })
+            .getOne();
+
+        const user = queue?.users.find(user => user.firstName === userInfo.firstName && user.lastName === userInfo.lastName)!        
+        return user
     }
 
     private async createDbConnection() {
@@ -73,8 +87,9 @@ export default class Bot implements BotMethods {
         try {
             const user = new User()
             user.firstName = userDTO.firstName
-            user.lastName = userDTO.lastName
-            user.telegramId = userDTO.id
+            user.lastName = userDTO.lastName!
+            user.telegramId = userDTO.id!
+            user.short = userDTO.short!
 
             await this.userRepository.save(user);
             const queue = await this.queueRepository
@@ -95,6 +110,21 @@ export default class Bot implements BotMethods {
         catch (error) {
             throw new Error(error)
         }
+    }
+
+    async swapUsers(caller: number, swapper: string, chatId: number): Promise<Queue> {
+        const userToSwapDTO = {
+            firstName: swapper.split(" ")[0],
+            lastName: swapper.split(" ")[1] || "",
+        }
+        const userCaller: User = (await this.userRepository.findOne({ telegramId: caller }))!
+        const userToSwap: User = (await this.userRepository.findOne({ firstName: userToSwapDTO.firstName, lastName: userToSwapDTO.lastName }))!
+
+        const queue = await this.queueRepository.createQueryBuilder("queue")
+            .leftJoinAndSelect("queue.users", "user")
+            .andWhere("queue.chatId = :chatId", { chatId: chatId.toString() })
+            .getOne()
+        return queue!
     }
 
     async deleteQueue(id: string): Promise<void> {

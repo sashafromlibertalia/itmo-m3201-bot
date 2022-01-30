@@ -15,6 +15,9 @@ export class User {
     @Column()
     lastName: string;
 
+    @Column()
+    short: string;
+
     @ManyToMany(() => Queue, queue => queue.users, { cascade: true, onDelete: "CASCADE" })
     queues: Queue[];
 }

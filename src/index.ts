@@ -2,7 +2,7 @@ import "reflect-metadata";
 import * as TelegramBot from "node-telegram-bot-api"
 import Bot from "./bot/bot";
 import { TOKEN, ADMIN_IDs } from "./config";
-import { findCommand, invalidCredentials } from "./helpers/helpers";
+import { findCommand, invalidCredentials, SWAP_EVENT_EMITTER } from "./helpers/helpers";
 import { Queries } from "./helpers/queries";
 import { UserDTO } from "./dto/user.dto";
 import { Queue } from "./entities/queue.entity";
@@ -73,26 +73,27 @@ listener.onText(/\/swap/, async (msg: TelegramBot.Message) => {
             let keys: TelegramBot.KeyboardButton[][] = []
 
             if (data.users.length > 0) {
-                response = `*${msg.from!.first_name}*, выбери коллегу, с кем хочешь свапнуться`
+                response = `*${msg.from!.first_name}*, выбери коллегу, с кем хочешь ${SWAP_EVENT_EMITTER}`
                 for (let i = 0; i < data.users.length; i += KEYS_PER_ROW) {
                     keys.push(data.users.slice(i, i + KEYS_PER_ROW).filter(user => user.telegramId !== msg.from!.id).map(user => {
                         return {
-                            text: user.firstName + " " + user.lastName,
+                            text: user.firstName + " " + user.lastName
                         }
                     }))
-                }      
-                keys.push([{text: "❌ Закрыть клавиатуру"}])          
+                }
+                keys.push([{ text: "❌ Закрыть клавиатуру" }])
             } else {
                 response = `\`Очередь ${data.id}\` пустая, коллеги`
             }
-            
+
             listener.sendMessage(chatId, response, {
                 parse_mode: "Markdown",
                 reply_markup: {
                     keyboard: keys,
                     one_time_keyboard: true,
                     selective: true,
-                    resize_keyboard: true
+                    resize_keyboard: true,
+                    remove_keyboard: true
                 },
                 reply_to_message_id: msg.message_id
             })
@@ -102,6 +103,27 @@ listener.onText(/\/swap/, async (msg: TelegramBot.Message) => {
                 parse_mode: "Markdown"
             });
         })
+})
+
+listener.on("message", async (msg: TelegramBot.Message) => {
+    const chatId = msg.chat.id;    
+    if (msg.reply_to_message?.text?.includes(SWAP_EVENT_EMITTER) &&
+        msg.reply_to_message?.from?.is_bot) {
+        const userToSwap: UserDTO = {
+            firstName: msg.text!.split(" ")[0],
+            lastName: msg.text!.split(" ")[1] || ""
+        }
+        bot.getUser(userToSwap, chatId)
+            .then((data) => {      
+                console.log(data.short);
+                                          
+                const response = `@${data.short}, с тобой хотят свапнуться, согласен?`
+                listener.sendMessage(chatId, response)
+            })
+            .catch((error: Error) => {
+                listener.sendMessage(chatId, error.message)
+            })
+    }
 })
 
 // listener.onText(/\/citgen/, async (msg: TelegramBot.Message) => {
@@ -127,7 +149,8 @@ listener.on("callback_query", async (query: TelegramBot.CallbackQuery) => {
             const userDto: UserDTO = {
                 firstName: query.from!.first_name,
                 lastName: query.from!.last_name || "",
-                id: query.from!.id
+                id: query.from!.id,
+                short: query.from!.username
             };
             await bot.addUserToQueue(userDto, chatId)
                 .then((data: User) => {
