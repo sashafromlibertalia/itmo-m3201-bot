@@ -114,9 +114,7 @@ listener.on("message", async (msg: TelegramBot.Message) => {
             lastName: msg.text!.split(" ")[1] || ""
         }
         bot.getUser(userToSwap, chatId)
-            .then((data) => {      
-                console.log(data.short);
-                                          
+            .then((data) => {                                                
                 const response = `@${data.short}, с тобой хотят свапнуться, согласен?`
                 listener.sendMessage(chatId, response)
             })
