@@ -1,18 +1,20 @@
 import { Connection, createConnection, Repository } from "typeorm";
 import { Queue } from "../entities/queue.entity";
 import "reflect-metadata";
-import { Queries } from "../helpers/queries";
 import { UserDTO } from "../dto/user.dto";
 import { User } from "../entities/user.entity";
 import { CitgenDTO } from "../dto/citgen.dto";
+import { SwapDTO } from "../dto/swap.dto";
 
 interface BotMethods {
-    getUser(userInfo: UserDTO, chatId: number): Promise<User>;
+    getUser(userDTO: UserDTO): Promise<User>;
+    getUserPositionAtQueue(user: User, queue: Queue): Promise<number>;
 
     createQueue(chatId: number): Promise<Queue>;
     showQueue(chatId: number): Promise<Queue>;
     deleteQueue(id: string): Promise<void>;
-    swapUsers(caller: number, swapper: string, chatId: number): Promise<Queue>;
+    swapUsers(users: SwapDTO): Promise<Queue>;
+
 
     addUserToQueue(user: UserDTO, chatId: number): Promise<User>;
 
@@ -31,17 +33,6 @@ export default class Bot implements BotMethods {
             this.queueRepository = this.connection.getRepository(Queue)
             this.userRepository = this.connection.getRepository(User)
         })
-    }
-
-    async getUser(userInfo: UserDTO, chatId: number): Promise<User> {
-        const queue = await this.queueRepository
-            .createQueryBuilder("queue")
-            .leftJoinAndSelect("queue.users", "user")
-            .andWhere("queue.chatId = :chatId", { chatId: chatId.toString() })
-            .getOne();
-
-        const user = queue?.users.find(user => user.firstName === userInfo.firstName && user.lastName === userInfo.lastName)!        
-        return user
     }
 
     private async createDbConnection() {
@@ -63,35 +54,74 @@ export default class Bot implements BotMethods {
         }
     }
 
+    async getUser(userDTO: UserDTO): Promise<User> {
+        let user: User | null = null
+        if (!!userDTO.firstName) {
+            user = (await this.userRepository.findOne({
+                where: {
+                    firstName: userDTO.firstName,
+                    lastName: userDTO.lastName,
+                },
+                relations: ["queues"]
+            }))!
+
+            return user
+        }
+
+        user = (await this.userRepository.findOne({
+            where: {
+                short: userDTO.short
+            },
+            relations: ["queues"]
+        }))!
+
+        return user!
+    }
+
+    async getUserPositionAtQueue(user: User, queue: Queue): Promise<number> {
+        if (!queue) throw new Error("Очередь не была предоставлена")
+        if (!user) throw new Error("Нету пользователя")
+
+        return queue.users.findIndex(u => u.id === user.id) + 1
+    }
+
     async showQueue(chatId: number): Promise<Queue> {
-        const queue = await this.queueRepository
-            .createQueryBuilder("queue")
-            .leftJoinAndSelect("queue.users", "user")
-            .andWhere("queue.chatId = :chatId", { chatId: chatId.toString() })
-            .getOne()
+        const queue = (await this.queueRepository.findOne({ where: { chatId: chatId.toString() }, relations: ["users"] }))!
 
         if (!queue) throw new Error("Очереди еще нет")
 
-        return queue
+        return queue!
     }
 
     async addUserToQueue(userDTO: UserDTO, chatId: number): Promise<User> {
-        // if (await this.userRepository
-        //     .createQueryBuilder("user")
-        //     .leftJoinAndSelect("user.queues", "queue")
-        //     .where("queue.chatId = :chatId", { chatId: chatId.toString() })
-        //     .andWhere("user.telegramId = :telegramId", { telegramId: userDTO.id })
-        //     .getOne())
-        //     throw new Error("Данный коллега уже добавлен во очередь")
+        if (await this.userRepository
+            .createQueryBuilder("user")
+            .leftJoinAndSelect("user.queues", "queue")
+            .where("queue.chatId = :chatId", { chatId: chatId.toString() })
+            .andWhere("user.telegramId = :telegramId", { telegramId: userDTO.id })
+            .getOne())
+            throw new Error("Данный коллега уже добавлен во очередь")
 
         try {
-            const user = new User()
-            user.firstName = userDTO.firstName
-            user.lastName = userDTO.lastName!
-            user.telegramId = userDTO.id!
-            user.short = userDTO.short!
+            let user: User = (await this.userRepository.findOne({
+                firstName: userDTO.firstName!,
+                lastName: userDTO.lastName!,
+                telegramId: userDTO.id!,
+                short: userDTO.short!,
+            }))!
+
+            if (!user) {
+                user = new User()
+                user.firstName = userDTO.firstName!
+                user.lastName = userDTO.lastName! + " " + new Date().getTime()
+                user.telegramId = userDTO.id!
+                user.short = userDTO.short!
+
+                await this.userRepository.save(user);
+            }
 
             await this.userRepository.save(user);
+
             const queue = await this.queueRepository
                 .createQueryBuilder("queue")
                 .leftJoinAndSelect("queue.users", "user")
@@ -112,19 +142,23 @@ export default class Bot implements BotMethods {
         }
     }
 
-    async swapUsers(caller: number, swapper: string, chatId: number): Promise<Queue> {
-        const userToSwapDTO = {
-            firstName: swapper.split(" ")[0],
-            lastName: swapper.split(" ")[1] || "",
-        }
-        const userCaller: User = (await this.userRepository.findOne({ telegramId: caller }))!
-        const userToSwap: User = (await this.userRepository.findOne({ firstName: userToSwapDTO.firstName, lastName: userToSwapDTO.lastName }))!
+    async swapUsers(users: SwapDTO): Promise<Queue> {
+        const queue = (await this.queueRepository.findOne({ where: { chatId: users.chatId.toString() }, relations: ["users"] }))!
 
-        const queue = await this.queueRepository.createQueryBuilder("queue")
-            .leftJoinAndSelect("queue.users", "user")
-            .andWhere("queue.chatId = :chatId", { chatId: chatId.toString() })
-            .getOne()
-        return queue!
+        const callerPosition = queue.users.findIndex(u => u.id === users.caller.id)
+        const resolverPosition = queue.users.findIndex(u => u.id === users.resolver.id)
+        const queuePosition = users.caller.queues.findIndex(q => q.chatId === queue.chatId)
+
+        queue.users[callerPosition] = users.resolver
+        queue.users[resolverPosition] = users.caller
+
+        users.caller.queues[queuePosition] = queue
+        users.resolver.queues[queuePosition] = queue
+
+        await this.userRepository.save(users.caller)
+        await this.userRepository.save(users.resolver)
+
+        return await this.queueRepository.save(queue)
     }
 
     async deleteQueue(id: string): Promise<void> {

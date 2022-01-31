@@ -1,9 +1,9 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToMany } from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, ManyToMany, JoinTable } from "typeorm";
 import { Queue } from "./queue.entity";
 
 @Entity("users")
 export class User {
-    @PrimaryGeneratedColumn("uuid")
+    @PrimaryGeneratedColumn()
     id: number;
 
     @Column()
@@ -18,6 +18,7 @@ export class User {
     @Column()
     short: string;
 
-    @ManyToMany(() => Queue, queue => queue.users, { cascade: true, onDelete: "CASCADE" })
+    @ManyToMany(() => Queue, queue => queue.users)
+    @JoinTable()
     queues: Queue[];
 }

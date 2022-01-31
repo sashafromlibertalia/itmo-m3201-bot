@@ -7,6 +7,7 @@ import { Queries } from "./helpers/queries";
 import { UserDTO } from "./dto/user.dto";
 import { Queue } from "./entities/queue.entity";
 import { User } from "./entities/user.entity";
+import { SwapDTO } from "./dto/swap.dto";
 
 const listener = new TelegramBot(TOKEN, { polling: true });
 const bot = new Bot();
@@ -33,6 +34,7 @@ listener.onText(/\/queues/, async (msg: TelegramBot.Message) => {
     await bot.showQueue(chatId)
         .then((data: Queue) => {
             let response: string = ""
+
             if (data.users.length > 0) {
                 response = `\`Очередь ${data.id}:\`\n\n`
                 for (let [index, user] of data.users.entries()) {
@@ -105,40 +107,73 @@ listener.onText(/\/swap/, async (msg: TelegramBot.Message) => {
         })
 })
 
-listener.on("message", async (msg: TelegramBot.Message) => {
+listener.on("text", async (msg: TelegramBot.Message) => {
     const chatId = msg.chat.id;
-    if (msg.reply_to_message?.text?.includes(SWAP_EVENT_EMITTER) &&
-        msg.reply_to_message?.from?.is_bot) {
-        const userToSwap: UserDTO = {
+    // Получаем список коллег на свап
+    if (msg.reply_to_message?.text?.includes(SWAP_EVENT_EMITTER) && msg.reply_to_message?.from?.is_bot && msg.text! !== "❌ Закрыть клавиатуру") {
+        const userToSwapDTO: UserDTO = {
             firstName: msg.text!.split(" ")[0],
             lastName: msg.text!.split(" ")[1] || ""
         }
+        const userCallerDTO: UserDTO = {
+            firstName: msg.from!.first_name,
+            lastName: msg.from!.last_name! || ""
+        }
 
-        bot.getUser(userToSwap, chatId)
-            .then((data) => {
-                const response = `@${data.short}, с тобой хотят ${SWAP_EVENT_COMMITTER}, согласен?`
-                listener.sendMessage(chatId, response, {
-                    reply_markup: {
-                        keyboard: [[{ text: "Да" }, { text: "Нет" }]],
-                        one_time_keyboard: true,
-                        selective: true,
-                        resize_keyboard: true,
-                        remove_keyboard: true
-                    },
-                    reply_to_message_id: msg.message_id
-                })
-            })
-            .catch((error: Error) => {
-                listener.sendMessage(chatId, error.message)
-            })
+        const caller: User = await bot.getUser(userCallerDTO)
+        const resolver: User = await bot.getUser(userToSwapDTO)
+        const queue: Queue = await bot.showQueue(chatId)
+
+        const callerPosition: number = await bot.getUserPositionAtQueue(caller, queue)
+
+        const response = `@${resolver.short}, с тобой хочет ${SWAP_EVENT_COMMITTER} @${caller.short} с ${callerPosition} места, согласен?`
+        listener.sendMessage(chatId, response, {
+            reply_markup: {
+                keyboard: [[{ text: "Да" }, { text: "Нет" }]],
+                one_time_keyboard: true,
+                selective: true,
+                resize_keyboard: true,
+                remove_keyboard: true
+            },
+            reply_to_message_id: msg.message_id
+        })
     }
-    else if (msg.reply_to_message?.text?.includes(SWAP_EVENT_COMMITTER) &&
-        msg.reply_to_message?.from?.is_bot) {
-            console.log(msg);
-            
+    // Обрабатываем свап
+    else if (msg.reply_to_message?.text?.includes(SWAP_EVENT_COMMITTER) && msg.reply_to_message?.from?.is_bot) {
         switch (msg.text!) {
             case "Да":
-                // TODO
+                const userToSwapDTO: UserDTO = {
+                    firstName: msg.from!.first_name,
+                    lastName: msg.from!.last_name! || ""
+                }
+                const userCallerDTO: UserDTO = {
+                    short: msg.reply_to_message.text!.match(/(\w+)/gm)![1]
+                }
+
+                const caller: User = await bot.getUser(userCallerDTO)
+                const resolver: User = await bot.getUser(userToSwapDTO)
+
+                const swapDTO: SwapDTO = {
+                    caller: caller,
+                    resolver: resolver,
+                    chatId: chatId
+                }
+
+                await bot.swapUsers(swapDTO)
+                    .then((data) => {
+                        let response: string = "Свап был успешно проведен, уважаемые коллеги\n\n"
+                        for (let [index, user] of data.users.entries()) {
+                            response += `${index + 1}. _${user.firstName} ${user.lastName}_\n`
+                        }
+
+                        listener.sendMessage(chatId, response, {
+                            parse_mode: "Markdown"
+                        })
+                    })
+                    .catch((error: Error) => {
+                        listener.sendMessage(chatId, error.message)
+                    })
+
                 break
             case "Нет":
                 listener.sendMessage(chatId, "Уважаемые коллеги, свап отменяется")

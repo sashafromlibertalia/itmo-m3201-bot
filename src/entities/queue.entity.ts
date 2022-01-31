@@ -3,7 +3,7 @@ import { User } from "./user.entity";
 
 @Entity("queues")
 export class Queue {
-    @PrimaryGeneratedColumn("uuid")
+    @PrimaryGeneratedColumn()
     id: number;
 
     @CreateDateColumn()
@@ -12,7 +12,6 @@ export class Queue {
     @Column()
     chatId: string;
 
-    @ManyToMany(() => User, user => user.queues)
-    @JoinTable()
+    @ManyToMany(() => User, user => user.queues, { cascade: true, onDelete: "CASCADE", onUpdate: "CASCADE"})
     users: User[];
 }
